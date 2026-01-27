@@ -1,0 +1,5 @@
+/home/maazahmad/Desktop/VN to text WA/src/main/java/com/maazahmad/whatsapptranscriber/WhatsAppTranscriberApplication.java
+/home/maazahmad/Desktop/VN to text WA/src/main/java/com/maazahmad/whatsapptranscriber/service/WhatsAppService.java
+/home/maazahmad/Desktop/VN to text WA/src/main/java/com/maazahmad/whatsapptranscriber/controller/WebhookController.java
+/home/maazahmad/Desktop/VN to text WA/src/main/java/com/maazahmad/whatsapptranscriber/dto/WhatsAppWebhookDto.java
+/home/maazahmad/Desktop/VN to text WA/src/main/java/com/maazahmad/whatsapptranscriber/service/GroqService.java
