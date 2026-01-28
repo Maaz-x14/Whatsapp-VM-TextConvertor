@@ -10,6 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
 @RestController
 @RequestMapping("/webhook")
 @RequiredArgsConstructor
@@ -18,6 +21,8 @@ public class WebhookController {
     private final WhatsAppService whatsAppService;
     private final GroqService groqService;
     private final ObjectMapper objectMapper; // Injected by Spring
+    // Add this at the top of the class
+    private final Set<String> processedMessageIds = ConcurrentHashMap.newKeySet();
 
     @Value("${whatsapp.verifyToken}")
     private String verifyToken;
@@ -58,6 +63,12 @@ public class WebhookController {
                         // 4. Check if it is an AUDIO message
                         if ("audio".equals(message.getType()) && message.getAudio() != null) {
                             String mediaId = message.getAudio().getId();
+                            if (processedMessageIds.contains(mediaId)) {
+                                System.out.println("Duplicate message ignored: " + mediaId);
+                                return ResponseEntity.ok().build();
+                            }
+
+                            processedMessageIds.add(mediaId);
                             System.out.println("Audio detected! Processing ID: " + mediaId);
 
                             // 5. Fire and forget (Async transcription)
