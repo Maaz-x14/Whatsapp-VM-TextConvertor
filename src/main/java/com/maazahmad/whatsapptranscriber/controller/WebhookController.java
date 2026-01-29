@@ -1,5 +1,6 @@
 package com.maazahmad.whatsapptranscriber.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.maazahmad.whatsapptranscriber.dto.WhatsAppWebhookDto;
 import com.maazahmad.whatsapptranscriber.service.GoogleSheetsService;
@@ -92,25 +93,60 @@ public class WebhookController {
     @Async
     public void processAudioAsync(String mediaId, String from) {
         try {
-            // Step 1: Download
+            // Step 1: Download Audio
             System.out.println("Fetching URL for Media ID: " + mediaId);
             String mediaUrl = whatsAppService.getMediaUrl(mediaId);
             byte[] audioData = whatsAppService.downloadFile(mediaUrl);
 
-            // Step 2: Transcribe
+            // Step 2: Transcribe (Whisper)
             System.out.println("Transcribing...");
             String transcribedText = groqService.transcribe(audioData);
+            System.out.println("User said: " + transcribedText);
 
-            // Step 3: Extract Data
-            System.out.println("Extracting JSON...");
-            String expenseJson = groqService.extractExpenseData(transcribedText);
+            // Step 3: Analyze Intent
+            System.out.println("Analyzing Intent...");
+            String analysisJson = groqService.analyzeInput(transcribedText);
 
-            // Step 4: Log to Google Sheets (THE NEW PART)
-            System.out.println("Logging to Google Sheets...");
-            googleSheetsService.logExpense(expenseJson);
+            JsonNode root = objectMapper.readTree(analysisJson);
+            String intent = root.path("intent").asText();
+            String replyMessage = "";
 
-            // Step 5: Reply
-            String replyMessage = "✅ *Expense Saved!* \n\n" + expenseJson;
+            if ("LOG_EXPENSE".equals(intent)) {
+                // ... (Logic remains the same) ...
+                JsonNode expenseDataNode = root.path("data");
+                String expenseJson = expenseDataNode.toString();
+                googleSheetsService.logExpense(expenseJson);
+
+                String item = expenseDataNode.path("item").asText();
+                String amount = expenseDataNode.path("amount").asText();
+                String currency = expenseDataNode.path("currency").asText();
+                replyMessage = String.format("✅ *Expense Saved!*\n🛒 %s\n💰 %s %s", item, amount, currency);
+
+            } else if ("QUERY_SPENDING".equals(intent)) {
+                // --- CASE B: ANSWER QUESTION (UPDATED) ---
+                JsonNode query = root.path("query");
+
+                String category = query.path("category").asText("ALL");
+                String merchant = query.path("merchant").asText("ALL"); // New Field
+                String item = query.path("item").asText("ALL");         // New Field
+                String start = query.path("start_date").asText();
+                String end = query.path("end_date").asText();
+
+                System.out.println("Querying: Cat=" + category + ", Merch=" + merchant + ", Item=" + item);
+
+                // Call updated calculator
+                String analyticsReport = googleSheetsService.calculateAnalytics(category, merchant, item, start, end);
+                replyMessage = "🔍 *CFO Report*\n" + analyticsReport;
+
+            } else if ("IRRELEVANT".equals(intent)) {
+                // --- CASE C: IGNORE SONGS/NOISE ---
+                System.out.println("Intent: IRRELEVANT");
+                replyMessage = "I only answer to expense related queries only.";
+
+            } else {
+                replyMessage = "🤔 I wasn't sure what you meant.";
+            }
+
             whatsAppService.sendReply(from, replyMessage);
 
         } catch (Exception e) {

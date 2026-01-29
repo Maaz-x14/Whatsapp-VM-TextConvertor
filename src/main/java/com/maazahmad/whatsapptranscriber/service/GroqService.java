@@ -63,46 +63,72 @@ public class GroqService {
         }
     }
 
-    // Step 2: Extract JSON Data (Llama 3)
+    /**
+     * MASTER BRAIN: Analyzes Intent (Log vs Query vs Irrelevant) & Extracts Data
+     */
     @SneakyThrows
-    public String extractExpenseData(String rawText) {
+    public String analyzeInput(String rawText) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(groqApiKey);
 
-        // System Prompt: Instructs the AI on its role
+        String today = LocalDate.now().toString();
+
         String systemPrompt = """
-            You are an expert AI accountant. Extract expense details into JSON.
+            You are an expert CFO AI. Analyze the user's input.
             
             Current Date Reference: %s
             
-            CRITICAL INSTRUCTION FOR DATES:
-            - You MUST calculate relative dates based on the Reference Date.
-            - "Yesterday" = Reference Date minus 1 day.
-            - "Last month" = Reference Date minus 1 month.
-            - "On this day last year" = Reference Date minus 1 year.
-            - If no date is mentioned, use the Reference Date.
+            STEP 1: DETERMINE INTENT
+            1. "LOG_EXPENSE": User is reporting spending (e.g., "I spent 500 on lunch").
+            2. "QUERY_SPENDING": User is asking for analytics (e.g., "How much did I spend on KFC?").
+            3. "IRRELEVANT": Input is NOT related to finances (e.g., songs, greetings, random noise, poetry).
             
-            Fields required:
-            - item (string): What was bought
-            - amount (number): The cost
-            - currency (string): e.g. USD, PKR, EUR (infer from context or default to PKR)
-            - merchant (string): Where it was bought
-            - category (string): Food, Transport, Utilities, Office, Entertainment, Other
-            - date (string): YYYY-MM-DD
+            STEP 2: EXTRACT DATA
             
-            Return ONLY the valid JSON object. Do not wrap it in markdown blocks.
-            """.formatted(LocalDate.now());
+            --- CASE A: LOG_EXPENSE ---
+            Extract: item, amount, currency (default PKR), merchant, category, date (YYYY-MM-DD).
+            
+            --- CASE B: QUERY_SPENDING ---
+            Extract filter parameters (use "ALL" if not specified):
+            - category (string): e.g., "Food"
+            - merchant (string): e.g., "KFC", "Uber"
+            - item (string): e.g., "Chicken Wings"
+            - start_date (string): YYYY-MM-DD
+            - end_date (string): YYYY-MM-DD
+            
+            --- CASE C: IRRELEVANT ---
+            No data needed.
+            
+            STEP 3: OUTPUT JSON ONLY
+            
+            Format for LOG_EXPENSE:
+            {
+              "intent": "LOG_EXPENSE",
+              "data": { "item": "...", "amount": 0, "currency": "...", "merchant": "...", "category": "...", "date": "..." }
+            }
+            
+            Format for QUERY_SPENDING:
+            {
+              "intent": "QUERY_SPENDING",
+              "query": { "category": "...", "merchant": "...", "item": "...", "start_date": "...", "end_date": "..." }
+            }
+            
+            Format for IRRELEVANT:
+            {
+              "intent": "IRRELEVANT",
+              "message": "I can only help you with financial records."
+            }
+            """.formatted(today);
 
-        // Construct the Payload
         Map<String, Object> body = Map.of(
-                "model", "llama-3.3-70b-versatile", // Intelligent model
+                "model", "llama-3.3-70b-versatile",
                 "messages", List.of(
                         Map.of("role", "system", "content", systemPrompt),
                         Map.of("role", "user", "content", rawText)
                 ),
-                "response_format", Map.of("type", "json_object"), // Enforce JSON
-                "temperature", 0.1 // Precision over creativity
+                "response_format", Map.of("type", "json_object"),
+                "temperature", 0.1
         );
 
         String jsonBody = objectMapper.writeValueAsString(body);
@@ -112,10 +138,9 @@ public class GroqService {
 
         if (response.getStatusCode().is2xxSuccessful()) {
             JsonNode root = objectMapper.readTree(response.getBody());
-            // Extract content from: choices[0].message.content
             return root.path("choices").get(0).path("message").path("content").asText();
         } else {
-            throw new RuntimeException("Failed to extract data: " + response.getStatusCode());
+            throw new RuntimeException("Failed to analyze input");
         }
     }
 }
