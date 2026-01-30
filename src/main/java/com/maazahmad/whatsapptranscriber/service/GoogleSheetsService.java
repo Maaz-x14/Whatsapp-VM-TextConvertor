@@ -143,7 +143,7 @@ public class GoogleSheetsService {
         }
 
         return "❌ Could not find '" + targetItem + "' " + (matchAnyDate ? "recently." : "on " + targetDateStr);
-    }   
+    }
 
     /**
      * UNDO LAST LOGIC

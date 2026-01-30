@@ -94,7 +94,6 @@ public class GroqService {
 
         String today = LocalDate.now().toString();
 
-        // UPDATED PROMPT: Now includes EDIT_EXPENSE and UNDO_LAST
         String systemPrompt = """
             You are an expert CFO AI. Analyze the user's input.
             
@@ -119,12 +118,12 @@ public class GroqService {
             --- CASE C: EDIT_EXPENSE ---
             Extract:
             - target_item (string): The item name.
-            - target_date (string):\s
+            - target_date (string):
                  - If user specifies "today", "yesterday", "last friday" -> Calculate YYYY-MM-DD.
                  - If user DOES NOT mention a date -> Return "LAST_MATCH".
             - new_amount (number): The corrected cost.
             - new_currency (string): The corrected currency (default to PKR).
-
+            
             --- CASE D: UNDO_LAST ---
             No specific data needed.
             
